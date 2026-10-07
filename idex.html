@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cifra de Vigenère // Cipher Terminal</title>
+<style>
+:root{
+  --green:#2bff6e; --green-dim:#0f5c2e; --bg:#020403; --panel:#041008cc;
+  --borda:#1c5c33; --campo:#020805; --texto-muted:#4f8a63; --red:#ff4d6a;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;background:#000;}
+body{
+  font-family:'Consolas','Courier New',monospace;
+  color:var(--green);
+  display:flex; align-items:center; justify-content:center;
+  min-height:100%; overflow-x:hidden; position:relative;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+canvas#rain{position:fixed;inset:0;width:100%;height:100%;z-index:0;}
+.overlay-vignette{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,.55) 100%);}
+
+.frame{
+  position:relative; z-index:2; width:min(560px, 94vw); margin:24px auto;
+  border:1.5px solid var(--green); border-radius:10px;
+  box-shadow:0 0 0 3px rgba(43,255,110,.06), 0 0 40px rgba(43,255,110,.15), inset 0 0 30px rgba(43,255,110,.04);
+  padding:20px 20px 16px;
+  background:rgba(2,6,4,.86);
+  -webkit-backdrop-filter:blur(2px);
+  backdrop-filter:blur(2px);
+}
+/* circuit corner deco */
+.circuit{position:absolute;top:-1px;left:-1px;width:120px;height:120px;pointer-events:none;opacity:.5;}
+
+.head{display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--green-dim); padding-bottom:10px; margin-bottom:16px; gap:8px;}
+.head .logo{color:var(--green);font-weight:700;letter-spacing:1px;font-size:14px;
+  text-shadow:0 0 8px rgba(43,255,110,.6);}
+.head .right{display:flex;align-items:center;gap:8px;}
+.sys{display:flex;align-items:center;gap:6px;color:var(--green);font-size:12px;letter-spacing:.5px;}
+.led{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:blink 1.8s infinite;}
+@keyframes blink{50%{opacity:.3}}
+.winbtn{width:26px;height:24px;border:1px solid var(--green-dim);border-radius:4px;background:#020805;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--green);
+  transition:background .15s;font-size:12px;}
+.winbtn:hover{background:rgba(43,255,110,.15);}
+.winbtn.close:hover{background:rgba(255,77,106,.2);border-color:var(--red);color:var(--red);}
+
+.shield-row{display:flex;align-items:center;gap:16px;margin-bottom:6px;}
+.shield svg{filter:drop-shadow(0 0 8px rgba(43,255,110,.6));flex:none;}
+h1{
+  font-size:clamp(24px,6vw,34px); margin:0; letter-spacing:1px; color:var(--green);
+  text-shadow:0 0 12px rgba(43,255,110,.6), 0 0 26px rgba(43,255,110,.3);
+  font-weight:700;
+}
+.subtitle{color:var(--texto-muted);font-size:14px;margin:4px 0 20px 66px;}
+
+.toggle-wrap{display:flex;justify-content:center;margin-bottom:20px;}
+.toggle{position:relative;display:flex;width:100%;background:#020805;border:1px solid var(--green-dim);
+  border-radius:8px;padding:4px;}
+.toggle .thumb{position:absolute;top:4px;left:4px;width:calc(50% - 4px);height:calc(100% - 8px);
+  border-radius:6px;background:rgba(43,255,110,.12);border:1.5px solid var(--green);
+  box-shadow:0 0 14px rgba(43,255,110,.45), inset 0 0 10px rgba(43,255,110,.15);
+  transition:transform .25s ease;}
+.toggle.dec .thumb{transform:translateX(100%);}
+.toggle button{flex:1;position:relative;z-index:1;background:none;border:none;padding:11px 0;
+  font-family:inherit;font-size:15px;font-weight:700;color:#3a6b4a;cursor:pointer;letter-spacing:1px;}
+.toggle button.active{color:var(--green);text-shadow:0 0 8px rgba(43,255,110,.6);}
+
+.panel{border:1px solid var(--green-dim);background:rgba(6,20,11,.55);border-radius:6px;
+  padding:13px 15px 15px;margin-bottom:14px;}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.panel-head span{color:var(--green);font-size:13px;letter-spacing:1px;font-weight:700;}
+textarea, input[type=text]{
+  width:100%; background:var(--campo); color:var(--green); border:1px solid var(--green-dim);
+  border-radius:5px; padding:10px 12px; font-size:15px; resize:none; outline:none;
+  font-family:inherit; caret-color:var(--green);
+}
+textarea{height:96px;}
+textarea::placeholder, input::placeholder{color:#2c5a3a;}
+.key-field{position:relative;display:flex;align-items:center;
+  border:1px solid var(--green); border-radius:5px; background:var(--campo);
+  box-shadow:0 0 8px rgba(43,255,110,.25);}
+.key-field svg{margin:0 10px;flex:none;color:var(--green);}
+.key-field input{border:none;background:transparent;padding:10px 10px 10px 0;box-shadow:none;}
+.counter{text-align:right;color:var(--texto-muted);font-size:12px;margin-top:6px;}
+.counter b{color:var(--green);}
+
+.actions{display:flex;gap:10px;margin-bottom:14px;}
+button.act{font-family:inherit;cursor:pointer;border-radius:6px;font-weight:700;font-size:15px;
+  padding:13px 10px;letter-spacing:.5px;transition:filter .15s, background .15s;}
+.primary{flex:1;background:rgba(43,255,110,.14);color:var(--green);border:1.5px solid var(--green);
+  box-shadow:0 0 16px rgba(43,255,110,.4), inset 0 0 12px rgba(43,255,110,.1);
+  text-shadow:0 0 6px rgba(43,255,110,.5);}
+.primary:hover{background:rgba(43,255,110,.24);}
+.outline{background:#020805;color:var(--texto-muted);border:1.5px solid var(--green-dim);}
+.outline:hover{background:rgba(43,255,110,.08);color:var(--green);}
+.ghost{background:#020805;color:#3a6b4a;border:1.5px solid var(--green-dim);font-size:13px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:7px;flex:1;padding:11px 8px;}
+.ghost:hover{background:rgba(43,255,110,.08);color:var(--green);}
+.ghost-row{display:flex;gap:10px;margin-top:12px;}
+
+.output-box{background:#01120a;border:1.5px solid var(--green);border-radius:5px;
+  padding:12px 14px;min-height:52px;font-size:15px;word-break:break-word;
+  box-shadow:0 0 14px rgba(43,255,110,.2);}
+.output-box.empty{color:var(--texto-muted);font-style:italic;font-size:13px;}
+.prompt{color:var(--green);margin-right:6px;}
+
+.status{text-align:center;margin-top:4px;color:var(--green);font-size:14px;letter-spacing:.6px;
+  text-shadow:0 0 6px rgba(43,255,110,.5);}
+
+.intro{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:18px;transition:opacity .4s ease;}
+.intro h2{color:var(--green);font-size:clamp(18px,5vw,26px);letter-spacing:2px;
+  text-shadow:0 0 14px rgba(43,255,110,.6);margin:0;}
+.intro .bar{color:var(--texto-muted);font-size:15px;letter-spacing:2px;}
+.intro.hide{opacity:0;pointer-events:none;}
+
+/* Botão flutuante para restaurar quando minimizado */
+.restore-btn{
+  position:fixed;top:16px;right:16px;z-index:60;
+  background:#020805;color:var(--green);border:1.5px solid var(--green);
+  border-radius:6px;padding:10px 16px;font-family:inherit;font-weight:700;
+  font-size:13px;letter-spacing:1px;cursor:pointer;
+  box-shadow:0 0 14px rgba(43,255,110,.4);
+  display:none;
+}
+.restore-btn:hover{background:rgba(43,255,110,.15);}
+.restore-btn.show{display:block;}
+
+@media (max-width:480px){
+  .actions{flex-direction:column;}
+  .subtitle{margin-left:0;}
+  .shield-row{flex-direction:column;text-align:center;}
+}
+</style>
+</head>
+<body>
+
+<canvas id="rain"></canvas>
+<div class="overlay-vignette"></div>
+
+<div class="intro" id="intro">
+  <h2>INICIALIZANDO SISTEMA</h2>
+  <div class="bar" id="introBar">[..........]</div>
+</div>
+
+<button class="restore-btn" id="restoreBtn">▲ RESTAURAR</button>
+
+<div class="frame" id="frame">
+  <svg class="circuit" viewBox="0 0 120 120" fill="none">
+    <path d="M10 60 H35 V35 H60 V10" stroke="#2bff6e" stroke-width="1" opacity=".5"/>
+    <path d="M10 80 H25 V95" stroke="#2bff6e" stroke-width="1" opacity=".5"/>
+    <circle cx="35" cy="35" r="2.5" fill="#2bff6e"/>
+    <circle cx="60" cy="10" r="2.5" fill="#2bff6e"/>
+    <circle cx="25" cy="95" r="2.5" fill="#2bff6e"/>
+  </svg>
+
+  <div class="head">
+    <div class="logo">VIGENÈRE // CIPHER TERMINAL</div>
+    <div class="right">
+      <div class="sys"><span class="led"></span>SISTEMA ATIVO</div>
+      <div class="winbtn" id="minBtn" title="Minimizar">_</div>
+      <div class="winbtn close" id="exitBtn" title="Sair">✕</div>
+    </div>
+  </div>
+
+  <div class="shield-row">
+    <div class="shield">
+      <svg width="52" height="58" viewBox="0 0 34 38" fill="none">
+        <path d="M17 1 L32 8 V19 C32 29 25 34 17 37 C9 34 2 29 2 19 V8 Z" stroke="#2bff6e" stroke-width="1.6" fill="#031a0d"/>
+        <rect x="12" y="17" width="10" height="12" rx="1.5" stroke="#2bff6e" stroke-width="1.8" fill="none"/>
+        <path d="M14 17 V13 a3 3 0 0 1 6 0 v4" stroke="#2bff6e" stroke-width="1.8" fill="none"/>
+        <circle cx="17" cy="22" r="1.6" fill="#2bff6e"/>
+      </svg>
+    </div>
+    <h1>CIFRA DE VIGENÈRE</h1>
+  </div>
+  <p class="subtitle">Cifre e decifre mensagens com uma chave secreta</p>
+
+  <div class="toggle-wrap">
+    <div class="toggle" id="toggle">
+      <div class="thumb"></div>
+      <button id="btnCif" class="active">CIFRAR</button>
+      <button id="btnDec">DECIFRAR</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span id="lblEntrada">//_ TEXTO DE ENTRADA</span></div>
+    <textarea id="entrada" maxlength="2000" placeholder="> Digite sua mensagem..."></textarea>
+    <div class="counter"><b id="cnt">0</b> / 2000</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span>CHAVE</span></div>
+    <div class="key-field">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="6" r="3.5" stroke="currentColor" stroke-width="1.6"/><line x1="8.5" y1="8.5" x2="14" y2="14" stroke="currentColor" stroke-width="1.6"/><line x1="11.5" y1="11.5" x2="13.5" y2="13.5" stroke="currentColor" stroke-width="1.6"/></svg>
+      <input type="text" id="chave" placeholder="Digite a chave secreta (A-Z)">
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="act primary" id="btnExec">EXECUTAR CIFRAGEM</button>
+    <button class="act outline" id="btnLimpar">LIMPAR</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span id="lblSaida">SAÍDA CIFRADA</span></div>
+    <div class="output-box empty" id="saida">O resultado aparecerá aqui</div>
+    <div class="ghost-row">
+      <button class="act ghost" id="btnCopiar">⧉ COPIAR</button>
+      <button class="act ghost" id="btnReusar">⇄ REUTILIZAR COMO ENTRADA</button>
+    </div>
+  </div>
+
+  <div class="status" id="status">● AGUARDANDO ENTRADA</div>
+</div>
+
+<script>
+// ---------- Chuva de binário no fundo ----------
+(function(){
+  const canvas = document.getElementById('rain');
+  const ctx = canvas.getContext('2d');
+  let w, h, cols, drops;
+  const fontSize = 16;
+  let resizeTimer = null;
+
+  function resize(){
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+    cols = Math.floor(w / fontSize);
+    drops = new Array(cols).fill(0).map(() => Math.random() * -50);
+  }
+  function onResize(){
+    if(resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(resize, 120);
+  }
+  window.addEventListener('resize', onResize);
+  resize();
+
+  function draw(){
+    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.font = fontSize + 'px monospace';
+    for(let i = 0; i < cols; i++){
+      const char = Math.random() > 0.5 ? '1' : '0';
+      const x = i * fontSize;
+      const y = drops[i] * fontSize;
+      ctx.fillStyle = Math.random() > 0.96 ? '#c8ffda' : 'rgba(43,255,110,0.75)';
+      ctx.fillText(char, x, y);
+      if(y > h && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ---------- Lógica Vigenère ----------
+function removerAcentos(t){return t.normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
+function limparChave(chave){
+  chave = removerAcentos(chave).toUpperCase().replace(/[^A-Z]/g,"");
+  if(!chave) throw new Error("A chave deve conter pelo menos uma letra (A-Z).");
+  return chave;
+}
+function vigenere(texto, chave, decifrar){
+  texto = removerAcentos(texto).toUpperCase();
+  chave = limparChave(chave);
+  let resultado = "", idx = 0;
+  for(const ch of texto){
+    if(ch >= "A" && ch <= "Z"){
+      let desloc = chave.charCodeAt(idx % chave.length) - 65;
+      if(decifrar) desloc = -desloc;
+      const novo = ((ch.charCodeAt(0) - 65 + desloc) % 26 + 26) % 26;
+      resultado += String.fromCharCode(novo + 65);
+      idx++;
+    } else resultado += ch;
+  }
+  return resultado;
+}
+
+// ---------- Estado / UI ----------
+let modo = "cifrar", resultado = "", typeTimer = null, execToken = 0;
+const $ = id => document.getElementById(id);
+const entrada = $("entrada"), chave = $("chave"), saida = $("saida"), status = $("status");
+const toggle = $("toggle"), btnCif = $("btnCif"), btnDec = $("btnDec");
+
+function setModo(novo){
+  if(novo === modo) return;
+  modo = novo;
+  const dec = modo === "decifrar";
+  toggle.classList.toggle("dec", dec);
+  btnCif.classList.toggle("active", !dec);
+  btnDec.classList.toggle("active", dec);
+  $("lblEntrada").textContent = dec ? "//_ TEXTO CIFRADO" : "//_ TEXTO DE ENTRADA";
+  $("lblSaida").textContent = dec ? "SAÍDA DECIFRADA" : "SAÍDA CIFRADA";
+  $("btnExec").textContent = dec ? "EXECUTAR DECIFRAGEM" : "EXECUTAR CIFRAGEM";
+  mostrar("");
+  setStatus(dec ? "● MODO DECIFRAR ATIVO" : "● MODO CIFRAR ATIVO", "info");
+}
+btnCif.onclick = () => setModo("cifrar");
+btnDec.onclick = () => setModo("decifrar");
+
+function atualizarContador(){ $("cnt").textContent = entrada.value.length; }
+entrada.addEventListener("input", atualizarContador);
+
+function mostrar(texto){
+  // Invalida qualquer animação anterior (evita race condition)
+  execToken++;
+  const meuToken = execToken;
+  if(typeTimer){ clearInterval(typeTimer); typeTimer = null; }
+
+  resultado = texto || "";
+
+  if(!texto){
+    saida.textContent = "O resultado aparecerá aqui";
+    saida.classList.add("empty");
+    return;
+  }
+  saida.classList.remove("empty");
+
+  // Cria estrutura segura: <span class="prompt">></span><span id="typed"></span>
+  saida.innerHTML = '';
+  const promptSpan = document.createElement('span');
+  promptSpan.className = 'prompt';
+  promptSpan.textContent = '> ';
+  const typedSpan = document.createElement('span');
+  saida.appendChild(promptSpan);
+  saida.appendChild(typedSpan);
+
+  let i = 0;
+  const passo = Math.max(1, Math.floor(texto.length / 40));
+  typeTimer = setInterval(() => {
+    if(meuToken !== execToken){ clearInterval(typeTimer); return; }
+    i = Math.min(i + passo, texto.length);
+    // textContent = seguro contra XSS
+    typedSpan.textContent = texto.slice(0, i);
+    if(i >= texto.length){ clearInterval(typeTimer); typeTimer = null; }
+  }, 18);
+}
+
+function setStatus(msg, tipo){
+  const cores = {ok:"#2bff6e", erro:"#ff4d6a", info:"#2bff6e", muted:"#4f8a63"};
+  status.textContent = msg;
+  status.style.color = cores[tipo];
+  status.style.textShadow = tipo === "erro" ? "0 0 6px rgba(255,77,106,.5)" : "0 0 6px rgba(43,255,110,.5)";
+}
+
+$("btnExec").onclick = () => {
+  const texto = entrada.value;
+  if(!texto.trim()){
+    mostrar("");
+    setStatus("▲ DIGITE UM TEXTO PARA CONTINUAR", "erro");
+    return;
+  }
+  try{
+    const res = vigenere(texto, chave.value, modo === "decifrar");
+    mostrar(res);
+    setStatus("● OPERAÇÃO CONCLUÍDA", "ok");
+  }catch(e){
+    mostrar("");
+    setStatus("▲ CHAVE INVÁLIDA — USE APENAS LETRAS A-Z", "erro");
+  }
+};
+
+$("btnLimpar").onclick = () => {
+  entrada.value = ""; chave.value = "";
+  atualizarContador(); mostrar("");
+  setStatus("● AGUARDANDO ENTRADA", "muted");
+};
+
+$("btnCopiar").onclick = async () => {
+  if(!resultado){ setStatus("▲ NÃO HÁ RESULTADO PARA COPIAR", "erro"); return; }
+  try{ await navigator.clipboard.writeText(resultado); } catch(e){}
+  setStatus("● RESULTADO COPIADO", "info");
+};
+
+$("btnReusar").onclick = () => {
+  if(!resultado){ setStatus("▲ NÃO HÁ RESULTADO PARA REUTILIZAR", "erro"); return; }
+  setModo(modo === "cifrar" ? "decifrar" : "cifrar");
+  entrada.value = resultado;
+  atualizarContador();
+  setStatus("● RESULTADO MOVIDO PARA A ENTRADA", "info");
+};
+
+entrada.addEventListener("keydown", e => { if(e.ctrlKey && e.key === "Enter") $("btnExec").click(); });
+chave.addEventListener("keydown", e => { if(e.key === "Enter") $("btnExec").click(); });
+
+// Janela: minimizar (recolhe o terminal) e sair (redireciona)
+const frame = $("frame");
+const restoreBtn = $("restoreBtn");
+let minimizado = false;
+
+$("minBtn").onclick = () => {
+  minimizado = true;
+  frame.style.display = "none";
+  restoreBtn.classList.add("show");
+};
+restoreBtn.onclick = () => {
+  minimizado = false;
+  frame.style.display = "block";
+  restoreBtn.classList.remove("show");
+};
+$("exitBtn").onclick = () => { window.location.href = "https://www.anthropic.com"; };
+
+// ---------- Animação de entrada ----------
+const intro = $("intro"), introBar = $("introBar");
+let passo = 0;
+const iv = setInterval(() => {
+  passo++;
+  introBar.textContent = "[" + "█".repeat(passo) + ".".repeat(Math.max(0,10-passo)) + "]";
+  if(passo >= 10){
+    clearInterval(iv);
+    setTimeout(() => {
+      intro.classList.add("hide");
+      setTimeout(() => intro.remove(), 450);
+    }, 150);
+  }
+}, 70);
+</script>
+</body>
+</html>
